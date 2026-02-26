@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>המרת PPF ל-CPI מוצפן</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .container {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 40px;
+      width: 480px;
+      max-width: 95vw;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
+    }
+
+    h1 {
+      font-size: 24px;
+      text-align: center;
+      margin-bottom: 8px;
+      color: #f8fafc;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #94a3b8;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+
+    .step {
+      margin-bottom: 24px;
+    }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .step-number {
+      background: #3b82f6;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .step-number.done {
+      background: #22c55e;
+    }
+
+    .step-label {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .upload-area {
+      border: 2px dashed #334155;
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .upload-area:hover {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    .upload-area.loaded {
+      border-color: #22c55e;
+      border-style: solid;
+      background: rgba(34, 197, 94, 0.05);
+    }
+
+    .upload-area input {
+      display: none;
+    }
+
+    .upload-icon {
+      font-size: 28px;
+      margin-bottom: 6px;
+    }
+
+    .upload-text {
+      color: #94a3b8;
+      font-size: 13px;
+    }
+
+    .file-info {
+      margin-top: 10px;
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 13px;
+    }
+
+    .file-info .row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+    }
+
+    .file-info .label {
+      color: #94a3b8;
+    }
+
+    .file-info .value {
+      color: #f8fafc;
+      font-weight: 600;
+    }
+
+    .divider {
+      height: 1px;
+      background: #334155;
+      margin: 28px 0;
+    }
+
+    .btn-convert {
+      width: 100%;
+      padding: 14px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-convert:hover:not(:disabled) {
+      background: #2563eb;
+      transform: translateY(-1px);
+    }
+
+    .btn-convert:disabled {
+      background: #334155;
+      color: #64748b;
+      cursor: not-allowed;
+    }
+
+    .btn-convert.ready {
+      background: #22c55e;
+    }
+
+    .btn-convert.ready:hover {
+      background: #16a34a;
+    }
+
+    .error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid #ef4444;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fca5a5;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+
+    .success {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid #22c55e;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #86efac;
+      font-size: 13px;
+      margin-top: 12px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>המרת PPF ל-CPI מוצפן</h1>
+    <p class="subtitle">נעילת חבילה לאורגן ספציפי עם הצפנת DES</p>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-number" id="step1-num">1</div>
+        <span class="step-label">העלאת קובץ אינפו (.n27)</span>
+      </div>
+      <div class="upload-area" id="info-area" onclick="document.getElementById('info-input').click()">
+        <input type="file" id="info-input" accept=".n27">
+        <div class="upload-icon">📋</div>
+        <div class="upload-text">לחץ לבחירת קובץ .n27</div>
+      </div>
+      <div id="info-details" style="display:none" class="file-info">
+        <div class="row">
+          <span class="label">שם דגם:</span>
+          <span class="value" id="model-name"></span>
+        </div>
+        <div class="row">
+          <span class="label">סריאל:</span>
+          <span class="value" id="serial-number"></span>
+        </div>
+        <div class="row">
+          <span class="label">מזהה מכשיר:</span>
+          <span class="value" id="full-id"></span>
+        </div>
+        <div class="row">
+          <span class="label">קובץ:</span>
+          <span class="value" id="info-file-name"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-number" id="step2-num">2</div>
+        <span class="step-label">העלאת קובץ PPF</span>
+      </div>
+      <div class="upload-area" id="ppf-area" onclick="document.getElementById('ppf-input').click()">
+        <input type="file" id="ppf-input" accept=".ppf">
+        <div class="upload-icon">📦</div>
+        <div class="upload-text">לחץ לבחירת קובץ .ppf</div>
+      </div>
+      <div id="ppi-details" style="display:none" class="file-info">
+        <div class="row">
+          <span class="label">שם חבילה:</span>
+          <span class="value" id="pack-title"></span>
+        </div>
+        <div class="row">
+          <span class="label">פריטים:</span>
+          <span class="value" id="pack-blobs"></span>
+        </div>
+        <div class="row">
+          <span class="label">גודל:</span>
+          <span class="value" id="pack-size"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <button class="btn-convert" id="btn-convert" disabled onclick="handleConvert()">
+      בחר קבצים כדי להמשיך
+    </button>
+
+    <div id="message"></div>
+  </div>
+
+  <script src="converter.js"></script>
+  <script>
+    let deviceInfo = null;
+    let modelName = null;
+    let packData = null;
+    let ppiFileName = '';
+
+    document.getElementById('info-input').addEventListener('change', handleInfoUpload);
+    document.getElementById('ppf-input').addEventListener('change', handlePpfUpload);
+
+    async function handleInfoUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        const buf = new Uint8Array(await file.arrayBuffer());
+        deviceInfo = PpiCpiConverter.parseN27(buf);
+        modelName = deviceInfo.modelName;
+
+        document.getElementById('model-name').textContent = deviceInfo.modelName;
+        document.getElementById('serial-number').textContent = deviceInfo.serial;
+        document.getElementById('full-id').textContent = deviceInfo.fullId;
+        document.getElementById('info-file-name').textContent = file.name;
+        document.getElementById('info-details').style.display = 'block';
+        document.getElementById('info-area').classList.add('loaded');
+        document.getElementById('step1-num').classList.add('done');
+        document.getElementById('step1-num').textContent = '✓';
+
+        updateButton();
+        clearMessage();
+      } catch (err) {
+        showError('שגיאה בקריאת קובץ האינפו: ' + err.message);
+      }
+    }
+
+    async function handlePpfUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        const buf = new Uint8Array(await file.arrayBuffer());
+        packData = PpiCpiConverter.parsePPFRaw(buf);
+        ppiFileName = file.name;
+
+        document.getElementById('pack-title').textContent = packData.title || 'ללא שם';
+        document.getElementById('pack-blobs').textContent = packData.blobs.length;
+        document.getElementById('pack-size').textContent = PpiCpiConverter.formatFileSize(buf.length);
+        document.getElementById('ppi-details').style.display = 'block';
+        document.getElementById('ppf-area').classList.add('loaded');
+        document.getElementById('step2-num').classList.add('done');
+        document.getElementById('step2-num').textContent = '✓';
+
+        updateButton();
+        clearMessage();
+      } catch (err) {
+        showError('שגיאה בקריאת קובץ ה-PPF: ' + err.message);
+      }
+    }
+
+    function updateButton() {
+      const btn = document.getElementById('btn-convert');
+      if (modelName && packData) {
+        btn.disabled = false;
+        btn.classList.add('ready');
+        btn.textContent = `הורד CPI נעול ל-${modelName} (${deviceInfo.fullId})`;
+      } else if (modelName) {
+        btn.disabled = true;
+        btn.classList.remove('ready');
+        btn.textContent = 'נותר להעלות קובץ PPF';
+      } else if (packData) {
+        btn.disabled = true;
+        btn.classList.remove('ready');
+        btn.textContent = 'נותר להעלות קובץ אינפו';
+      }
+    }
+
+    async function handleConvert() {
+      if (!modelName || !packData) return;
+
+      const btn = document.getElementById('btn-convert');
+      btn.disabled = true;
+      btn.textContent = 'מצפין... אנא המתן';
+      clearMessage();
+
+      // Let UI update before heavy computation
+      await new Promise(r => setTimeout(r, 50));
+
+      try {
+        const cpiBuffer = PpiCpiConverter.buildEncryptedCPI(packData, deviceInfo.modelName, 1, deviceInfo.fullId);
+
+        const blob = new Blob([cpiBuffer], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${modelName}_PackInstallData.cpi`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        const size = PpiCpiConverter.formatFileSize(cpiBuffer.length);
+        showSuccess(`הקובץ ${modelName}_PackInstallData.cpi (${size}) הורד בהצלחה — נעול למכשיר ${deviceInfo.serial}`);
+      } catch (err) {
+        showError('שגיאה בהמרה: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.classList.add('ready');
+        btn.textContent = `הורד CPI נעול ל-${modelName} (${deviceInfo.fullId})`;
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('message').innerHTML = `<div class="error">${msg}</div>`;
+    }
+
+    function showSuccess(msg) {
+      document.getElementById('message').innerHTML = `<div class="success">${msg}</div>`;
+    }
+
+    function clearMessage() {
+      document.getElementById('message').innerHTML = '';
+    }
+  </script>
+</body>
+</html>
