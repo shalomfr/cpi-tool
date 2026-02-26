@@ -252,6 +252,23 @@
       </div>
     </div>
 
+    <div class="step">
+      <div class="step-header">
+        <div class="step-number" id="step3-num">3</div>
+        <span class="step-label">סוג הצפנה</span>
+      </div>
+      <div style="display:flex; gap:12px; flex-direction:column;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; padding:8px 12px; background:#0f172a; border-radius:8px; border:1px solid #334155;">
+          <input type="radio" name="lock-mode" value="locked" checked style="accent-color:#3b82f6">
+          <span>נעול למכשיר (דורש קובץ N27)</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; padding:8px 12px; background:#0f172a; border-radius:8px; border:1px solid #334155;">
+          <input type="radio" name="lock-mode" value="standard" style="accent-color:#3b82f6">
+          <span>ללא נעילת מכשיר (CSEC סטנדרטי)</span>
+        </label>
+      </div>
+    </div>
+
     <div class="divider"></div>
 
     <button class="btn-convert" id="btn-convert" disabled onclick="handleConvert()">
@@ -269,6 +286,7 @@
 
     document.getElementById('info-input').addEventListener('change', handleInfoUpload);
     document.getElementById('ppf-input').addEventListener('change', handlePpfUpload);
+    document.querySelectorAll('input[name="lock-mode"]').forEach(r => r.addEventListener('change', updateButton));
 
     async function handleInfoUpload(e) {
       const file = e.target.files[0];
@@ -304,8 +322,8 @@
         ppiData = PpiCpiConverter.parsePPI(buf);
         ppiFileName = file.name;
 
-        document.getElementById('pack-title').textContent = ppiData.title || 'ללא שם';
-        document.getElementById('pack-blobs').textContent = ppiData.blobCount;
+        document.getElementById('pack-title').textContent = ppiData.title || ppiData.modelName;
+        document.getElementById('pack-blobs').textContent = ppiData.blobCount + (ppiData.packType === 'wave' ? ' (Wave Pack)' : '');
         document.getElementById('pack-size').textContent = PpiCpiConverter.formatFileSize(buf.length);
         document.getElementById('ppi-details').style.display = 'block';
         document.getElementById('ppf-area').classList.add('loaded');
@@ -319,25 +337,40 @@
       }
     }
 
+    function getLockMode() {
+      return document.querySelector('input[name="lock-mode"]:checked')?.value || 'locked';
+    }
+
     function updateButton() {
       const btn = document.getElementById('btn-convert');
-      if (deviceInfo && ppiData) {
+      const mode = getLockMode();
+      const needsN27 = mode === 'locked';
+
+      if (ppiData && (!needsN27 || deviceInfo)) {
         btn.disabled = false;
         btn.classList.add('ready');
-        btn.textContent = `הורד CPI נעול ל-${ppiData.modelName} (${deviceInfo.fullId})`;
-      } else if (deviceInfo) {
+        if (needsN27 && deviceInfo) {
+          btn.textContent = `הורד CPI נעול ל-${ppiData.modelName} (${deviceInfo.fullId})`;
+        } else {
+          btn.textContent = `הורד CPI ללא נעילה — ${ppiData.modelName}`;
+        }
+      } else if (!ppiData) {
         btn.disabled = true;
         btn.classList.remove('ready');
         btn.textContent = 'נותר להעלות קובץ PPI';
-      } else if (ppiData) {
+      } else if (needsN27 && !deviceInfo) {
         btn.disabled = true;
         btn.classList.remove('ready');
-        btn.textContent = 'נותר להעלות קובץ אינפו';
+        btn.textContent = 'נותר להעלות קובץ אינפו (N27)';
       }
     }
 
     async function handleConvert() {
-      if (!deviceInfo || !ppiData) return;
+      if (!ppiData) return;
+
+      const mode = getLockMode();
+      const useDeviceLock = mode === 'locked' && deviceInfo;
+      if (mode === 'locked' && !deviceInfo) return;
 
       const btn = document.getElementById('btn-convert');
       btn.disabled = true;
@@ -348,7 +381,8 @@
       await new Promise(r => setTimeout(r, 50));
 
       try {
-        const cpiBuffer = PpiCpiConverter.buildCPIFromPPI(ppiData, deviceInfo.fullId);
+        const fullId = useDeviceLock ? deviceInfo.fullId : null;
+        const cpiBuffer = PpiCpiConverter.buildCPIFromPPI(ppiData, fullId);
 
         const blob = new Blob([cpiBuffer], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
@@ -359,13 +393,13 @@
         URL.revokeObjectURL(url);
 
         const size = PpiCpiConverter.formatFileSize(cpiBuffer.length);
-        showSuccess(`הקובץ ${ppiData.modelName}_PackInstallData.cpi (${size}) הורד בהצלחה — נעול למכשיר ${deviceInfo.serial}`);
+        const lockMsg = useDeviceLock ? ` — נעול למכשיר ${deviceInfo.serial}` : ' — ללא נעילת מכשיר';
+        showSuccess(`הקובץ ${ppiData.modelName}_PackInstallData.cpi (${size}) הורד בהצלחה${lockMsg}`);
       } catch (err) {
         showError('שגיאה בהמרה: ' + err.message);
       } finally {
         btn.disabled = false;
-        btn.classList.add('ready');
-        btn.textContent = `הורד CPI נעול ל-${ppiData.modelName} (${deviceInfo.fullId})`;
+        updateButton();
       }
     }
 

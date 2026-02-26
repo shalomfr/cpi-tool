@@ -6,6 +6,7 @@ const KNOWN_TAGS = new Set([
   'XPFH', 'XPIH', 'XMDL', 'XPID',
   'EUID', 'ETIT', 'BLOB', 'EEXT', 'EICO', 'FBIN',
   'CSEC',
+  'VWDT', 'VPRM', 'PACK',
 ]);
 
 const textDecoder = new TextDecoder('ascii');
@@ -654,18 +655,31 @@ function parsePPI(buf) {
   // Everything after XPIH is the unencrypted payload
   const payloadRaw = buf.slice(xpihEnd);
 
-  // Also parse payload chunks for display info
+  // Parse payload chunks for display info
   const payloadChunks = readChunks(payloadRaw, 0);
   let uid = '';
   let title = '';
   const blobs = [];
+  let hasVWDT = false;
+
   for (const chunk of payloadChunks) {
     if (chunk.id === 'EUID' && !uid) uid = chunkText(chunk);
     else if (chunk.id === 'ETIT' && !title) title = chunkText(chunk);
     else if (chunk.id === 'BLOB') blobs.push(chunk);
+    else if (chunk.id === 'VWDT') hasVWDT = true;
+    else if (chunk.id === 'VPRM') { /* voice parameters */ }
+    else if (chunk.id === 'PACK') {
+      // Extract title and blobs from PACK sub-chunks
+      const packSubs = readSubChunks(chunk);
+      for (const ps of packSubs) {
+        if (ps.id === 'ETIT' && !title) title = chunkText(ps);
+        else if (ps.id === 'BLOB') blobs.push(ps);
+      }
+    }
   }
 
-  return { modelName, packInstallId, xpihChunk, payloadRaw, uid, title, blobCount: blobs.length };
+  const packType = hasVWDT ? 'wave' : 'standard';
+  return { modelName, packInstallId, xpihChunk, payloadRaw, uid, title, blobCount: blobs.length, packType };
 }
 
 /**
