@@ -623,6 +623,70 @@ function buildEncryptedCPI(packData, modelName, packInstallId, deviceFullId) {
   return concatArrays([xpihChunk, csecChunk, payloadEncrypted]);
 }
 
+// ---- PPI Parser ----
+
+/**
+ * Parse a PPI file (unencrypted CPI).
+ * Structure: XPIH(XMDL + XPID) + payload(EUID, ETIT, BLOBs)
+ * Returns { modelName, packInstallId, xpihChunk, payloadRaw }
+ */
+function parsePPI(buf) {
+  // Read XPIH header
+  const tag = readFourCC(buf, 0);
+  if (tag !== 'XPIH') throw new Error('קובץ PPI לא תקין — חסר XPIH header');
+  const xpihSize = readUint32BE(buf, 4);
+  const xpihEnd = 8 + xpihSize;
+
+  // Parse XPIH sub-chunks for model name and pack ID
+  const xpihChunks = readChunks(buf, 8, xpihEnd);
+  let modelName = '';
+  let packInstallId = 1;
+  for (const c of xpihChunks) {
+    if (c.id === 'XMDL') modelName = chunkText(c);
+    else if (c.id === 'XPID' && c.data.length >= 4) packInstallId = readUint32BE(c.data, 0);
+  }
+
+  if (!modelName) throw new Error('לא נמצא שם דגם (XMDL) בקובץ PPI');
+
+  // Keep the original XPIH chunk bytes
+  const xpihChunk = buf.slice(0, xpihEnd);
+
+  // Everything after XPIH is the unencrypted payload
+  const payloadRaw = buf.slice(xpihEnd);
+
+  // Also parse payload chunks for display info
+  const payloadChunks = readChunks(payloadRaw, 0);
+  let uid = '';
+  let title = '';
+  const blobs = [];
+  for (const chunk of payloadChunks) {
+    if (chunk.id === 'EUID' && !uid) uid = chunkText(chunk);
+    else if (chunk.id === 'ETIT' && !title) title = chunkText(chunk);
+    else if (chunk.id === 'BLOB') blobs.push(chunk);
+  }
+
+  return { modelName, packInstallId, xpihChunk, payloadRaw, uid, title, blobCount: blobs.length };
+}
+
+/**
+ * Encrypt a parsed PPI into a CPI file.
+ * Takes the original XPIH + raw payload, adds CSEC and encrypts payload.
+ */
+function buildCPIFromPPI(ppiData, deviceFullId) {
+  const { xpihChunk, payloadRaw } = ppiData;
+
+  // CSEC — device-locked if fullId provided, otherwise standard
+  const csecData = deviceFullId ? generateLockedCSEC(deviceFullId) : CSEC_ENCRYPTED;
+  const csecChunk = buildChunk('CSEC', csecData);
+
+  // Pad and encrypt payload
+  const payloadPadded = addYamahaPadding(payloadRaw);
+  const payloadEncrypted = encryptDES_CBC(payloadPadded, DES_KEY, DES_IV);
+
+  // Assemble: XPIH + CSEC + encrypted payload
+  return concatArrays([xpihChunk, csecChunk, payloadEncrypted]);
+}
+
 // ---- Utility ----
 
 function formatFileSize(bytes) {
@@ -633,4 +697,4 @@ function formatFileSize(bytes) {
 
 // ---- Public API ----
 
-window.PpiCpiConverter = { parseN27, parsePPFRaw, buildEncryptedCPI, formatFileSize, generateLockedCSEC, keyDerivation };
+window.PpiCpiConverter = { parseN27, parsePPFRaw, parsePPI, buildEncryptedCPI, buildCPIFromPPI, formatFileSize, generateLockedCSEC, keyDerivation };

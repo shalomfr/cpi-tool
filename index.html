@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>המרת PPF ל-CPI מוצפן</title>
+  <title>המרת PPI ל-CPI מוצפן</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -193,7 +193,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>המרת PPF ל-CPI מוצפן</h1>
+    <h1>המרת PPI ל-CPI מוצפן</h1>
     <p class="subtitle">נעילת חבילה לאורגן ספציפי עם הצפנת DES</p>
 
     <div class="step">
@@ -229,12 +229,12 @@
     <div class="step">
       <div class="step-header">
         <div class="step-number" id="step2-num">2</div>
-        <span class="step-label">העלאת קובץ PPF</span>
+        <span class="step-label">העלאת קובץ PPI</span>
       </div>
       <div class="upload-area" id="ppf-area" onclick="document.getElementById('ppf-input').click()">
-        <input type="file" id="ppf-input" accept=".ppf">
+        <input type="file" id="ppf-input" accept=".ppi">
         <div class="upload-icon">📦</div>
-        <div class="upload-text">לחץ לבחירת קובץ .ppf</div>
+        <div class="upload-text">לחץ לבחירת קובץ .ppi</div>
       </div>
       <div id="ppi-details" style="display:none" class="file-info">
         <div class="row">
@@ -264,8 +264,7 @@
   <script src="converter.js"></script>
   <script>
     let deviceInfo = null;
-    let modelName = null;
-    let packData = null;
+    let ppiData = null;
     let ppiFileName = '';
 
     document.getElementById('info-input').addEventListener('change', handleInfoUpload);
@@ -302,11 +301,11 @@
 
       try {
         const buf = new Uint8Array(await file.arrayBuffer());
-        packData = PpiCpiConverter.parsePPFRaw(buf);
+        ppiData = PpiCpiConverter.parsePPI(buf);
         ppiFileName = file.name;
 
-        document.getElementById('pack-title').textContent = packData.title || 'ללא שם';
-        document.getElementById('pack-blobs').textContent = packData.blobs.length;
+        document.getElementById('pack-title').textContent = ppiData.title || 'ללא שם';
+        document.getElementById('pack-blobs').textContent = ppiData.blobCount;
         document.getElementById('pack-size').textContent = PpiCpiConverter.formatFileSize(buf.length);
         document.getElementById('ppi-details').style.display = 'block';
         document.getElementById('ppf-area').classList.add('loaded');
@@ -316,21 +315,21 @@
         updateButton();
         clearMessage();
       } catch (err) {
-        showError('שגיאה בקריאת קובץ ה-PPF: ' + err.message);
+        showError('שגיאה בקריאת קובץ ה-PPI: ' + err.message);
       }
     }
 
     function updateButton() {
       const btn = document.getElementById('btn-convert');
-      if (modelName && packData) {
+      if (deviceInfo && ppiData) {
         btn.disabled = false;
         btn.classList.add('ready');
-        btn.textContent = `הורד CPI נעול ל-${modelName} (${deviceInfo.fullId})`;
-      } else if (modelName) {
+        btn.textContent = `הורד CPI נעול ל-${ppiData.modelName} (${deviceInfo.fullId})`;
+      } else if (deviceInfo) {
         btn.disabled = true;
         btn.classList.remove('ready');
-        btn.textContent = 'נותר להעלות קובץ PPF';
-      } else if (packData) {
+        btn.textContent = 'נותר להעלות קובץ PPI';
+      } else if (ppiData) {
         btn.disabled = true;
         btn.classList.remove('ready');
         btn.textContent = 'נותר להעלות קובץ אינפו';
@@ -338,7 +337,7 @@
     }
 
     async function handleConvert() {
-      if (!modelName || !packData) return;
+      if (!deviceInfo || !ppiData) return;
 
       const btn = document.getElementById('btn-convert');
       btn.disabled = true;
@@ -349,24 +348,24 @@
       await new Promise(r => setTimeout(r, 50));
 
       try {
-        const cpiBuffer = PpiCpiConverter.buildEncryptedCPI(packData, deviceInfo.modelName, 1, deviceInfo.fullId);
+        const cpiBuffer = PpiCpiConverter.buildCPIFromPPI(ppiData, deviceInfo.fullId);
 
         const blob = new Blob([cpiBuffer], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${modelName}_PackInstallData.cpi`;
+        a.download = `${ppiData.modelName}_PackInstallData.cpi`;
         a.click();
         URL.revokeObjectURL(url);
 
         const size = PpiCpiConverter.formatFileSize(cpiBuffer.length);
-        showSuccess(`הקובץ ${modelName}_PackInstallData.cpi (${size}) הורד בהצלחה — נעול למכשיר ${deviceInfo.serial}`);
+        showSuccess(`הקובץ ${ppiData.modelName}_PackInstallData.cpi (${size}) הורד בהצלחה — נעול למכשיר ${deviceInfo.serial}`);
       } catch (err) {
         showError('שגיאה בהמרה: ' + err.message);
       } finally {
         btn.disabled = false;
         btn.classList.add('ready');
-        btn.textContent = `הורד CPI נעול ל-${modelName} (${deviceInfo.fullId})`;
+        btn.textContent = `הורד CPI נעול ל-${ppiData.modelName} (${deviceInfo.fullId})`;
       }
     }
 
